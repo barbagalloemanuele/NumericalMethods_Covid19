@@ -1,4 +1,7 @@
-# Report Fase 4: Calibrazione tramite Minimi Quadrati
+# Report Fase 4: Calibrazione tramite Minimi Quadrati (Percorso A)
+
+> **Nota di Contesto:** Questa fase fa parte del **Percorso A (Approccio Numerico Classico)** del progetto. Calibra i parametri della PDE risolta nella Fase 3 usando l'ottimizzazione classica (Least Squares), che verrà poi messa a confronto con l'addestramento della PINN (Percorso B).
+
 
 ## Cosa bisogna fare in questa fase
 Nei modelli matematici applicati alla realtà, le equazioni (PDE) contengono dei parametri fisici che non conosciamo a priori. Nel nostro caso, non sappiamo qual è il reale **Coefficiente di Diffusione ($D$)** del Covid-19 in Italia. 

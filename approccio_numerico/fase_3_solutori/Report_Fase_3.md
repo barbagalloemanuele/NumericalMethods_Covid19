@@ -1,4 +1,7 @@
-# Report Fase 3: Solutori Iterativi
+# Report Fase 3: Solutori Iterativi (Percorso A)
+
+> **Nota di Contesto:** Questa fase fa parte del **Percorso A (Approccio Numerico Classico)** del progetto. Applica i metodi iterativi per risolvere il sistema generato nella Fase 2.
+
 
 ## Cosa bisogna fare in questa fase
 Avendo costruito l'enorme matrice sparsa $A$ (Laplaciano) nella Fase 2, dobbiamo risolvere il sistema lineare $Ax = b$ per poter simulare lo scorrere del tempo (e la propagazione del virus). 

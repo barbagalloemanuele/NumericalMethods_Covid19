@@ -1,4 +1,7 @@
-# Report Fase 2: Discretizzazione della PDE e Algebra Lineare
+# Report Fase 2: Discretizzazione della PDE e Algebra Lineare (Percorso A)
+
+> **Nota di Contesto:** Questa fase fa parte del **Percorso A (Approccio Numerico Classico)** del progetto. Serve a costruire l'infrastruttura matematica su griglia che verrà poi confrontata con le Reti Neurali (Percorso B).
+
 
 ## Cosa bisogna fare in questa fase
 Questa è la fase più "matematica" del progetto. Il modello epidemico si basa su un'Equazione alle Derivate Parziali (PDE) spaziale (l'equazione di diffusione). I computer non sanno risolvere equazioni continue; dobbiamo trasformarle in un gigantesco sistema lineare $Ax = b$.

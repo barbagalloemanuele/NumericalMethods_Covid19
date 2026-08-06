@@ -1,34 +1,29 @@
-# Progetto: Simulazione Spaziale di Diffusione Epidemica tramite Metodi Numerici
+# Progetto: Simulazione Spaziale di Diffusione Epidemica (Numerico vs PINN)
 
 ## 1. Descrizione dell'Idea
-Il progetto si pone l'obiettivo di superare i classici modelli epidemiologici temporali (in cui si calcola solo il numero totale di infetti in un'intera nazione) per passare a un **modello spazio-temporale**. 
-L'idea è simulare *come* il virus si sposta geograficamente su una mappa 2D col passare del tempo. Questo viene matematicamente modellato tramite un'Equazione alle Derivate Parziali (PDE) di tipo diffusione-reazione. 
+Il progetto si pone l'obiettivo di superare i classici modelli epidemiologici temporali (in cui si calcola solo il numero totale di infetti in un'intera nazione) per passare a un **modello spazio-temporale**. L'idea è simulare *come* il virus si sposta geograficamente su una mappa 2D col passare del tempo, ricavando i parametri di diffusione dai dati reali.
 
-Per risolvere questa equazione al computer, lo spazio continuo (la mappa geografica) viene trasformato in una griglia discreta (Discretizzazione tramite Differenze Finite). Questa operazione matematica converte la complessa equazione differenziale in un **sistema lineare di enormi dimensioni ($Ax = b$)**, la cui matrice $A$ risulta essere molto grande ma "sparsa" (piena di zeri). 
-Per risolvere questo sistema verranno utilizzati e confrontati vari **Metodi Iterativi**. Infine, il modello verrà calibrato sui dati reali tramite i **Minimi Quadrati**.
+In seguito al confronto con il Professore, il progetto è stato strutturato come un'**Analisi Comparativa** tra due approcci di modellazione e risoluzione:
+*   **Percorso A (Approccio Numerico Classico):** La matematica del contagio viene modellata tramite un'Equazione alle Derivate Parziali (PDE) spaziale, discretizzata su una griglia tramite differenze finite e risolta numericamente.
+*   **Percorso B (Physics-Informed Neural Networks - PINN):** Il medesimo problema viene affrontato addestrando una Rete Neurale profonda la cui funzione di Loss ingloba la fisica del sistema (la PDE) e i dati storici (Data Fitting simultaneo).
 
 ## 2. Utilità e Risoluzione di un Problema Reale
-Prevedere non solo *quando* ci sarà il picco di un'epidemia, ma *dove* si concentrerà, è un problema reale di fondamentale importanza per:
-*   **Allocazione delle risorse:** Sapere in anticipo quali province avranno bisogno di più posti letto in terapia intensiva.
-*   **Restrizioni mirate:** Permette ai decisori politici di istituire "Zone Rosse" mirate invece di lockdown nazionali indiscriminati, salvaguardando l'economia delle regioni non a rischio.
+Prevedere non solo *quando* ci sarà il picco di un'epidemia, ma *dove* si concentrerà, è cruciale per allocare risorse ospedaliere e istituire "Zone Rosse" mirate.
+Inoltre, il progetto risponde alla moderna sfida del Calcolo Scientifico: determinare se e quando gli algoritmi di Deep Learning (PINN) possano essere più veloci, flessibili o accurati rispetto all'algebra lineare sparsa classica nel risolvere problemi differenziali fisici.
 
 ### Da dove ottenere i dati e quale periodo analizzare?
-Utilizzeremo i **dati storici COVID-19 della Protezione Civile Italiana**, reperibili pubblicamente dal loro repository GitHub ufficiale. 
-*   **Perché:** Offrono la **granularità spaziale** necessaria per questo progetto (dati dei contagi suddivisi per singola *Provincia* e *Regione* ogni giorno). 
-*   **Periodo Scelto:** Il progetto si focalizzerà sulla **Prima Ondata (Febbraio - Maggio 2020)**. Dal punto di vista matematico della diffusione (PDE), è il periodo perfetto: il virus è partito da focolai molto localizzati (es. Codogno in Lombardia, Vo' in Veneto) e si è propagato spazialmente e gradualmente verso il resto d'Italia a "macchia d'olio". Questo crea un chiaro gradiente spaziale, ideale per essere catturato dal modello di diffusione e calibrato dai minimi quadrati.
+Utilizzeremo i **dati storici COVID-19 della Protezione Civile Italiana** (GitHub ufficiale).
+Ci focalizzeremo sulla **Prima Ondata (Febbraio - Maggio 2020)**. Matematicamente, è il periodo perfetto: il virus è partito da focolai localizzati (es. Codogno) e si è propagato a "macchia d'olio", creando gradienti spaziali ideali per essere catturati dai solutori e calibrati tramite l'ottimizzazione ai minimi quadrati / backpropagation.
 
 ## 3. Argomenti Teorici del Corso Toccati
+Il progetto copre trasversalmente quasi tutto il programma del corso, unendo i vari moduli:
 
-Il progetto copre trasversalmente quasi tutto il programma del Prof. Boscarino, unendo i vari moduli in un'unica pipeline logica:
+### A. Metodi Numerici su Matrici Sparse (Percorso Classico)
+*   **Discretizzazione PDE:** L'equazione di diffusione spaziale (Laplaciano) viene discretizzata a differenze finite generando un enorme sistema lineare sparso $Ax=b$.
+*   **Solutori Iterativi:** Il sistema viene risolto implementando e confrontando **Conjugate Gradient (CG)** e **GMRES**, evitando volutamente inefficaci metodi diretti di inversione.
+*   **Ottimizzazione e Minimi Quadrati:** Il parametro di diffusione incognito $D$ viene ricercato calibrando il modello sui dati reali tramite l'algoritmo di **Levenberg-Marquardt** (Data Fitting ai minimi quadrati non lineari).
 
-### A. Discretizzazione di Equazioni alle Derivate Parziali (PDE)
-*   **Concetto:** La PDE della diffusione termica/epidemica viene discretizzata usando il metodo delle differenze finite su una griglia 2D.
-*   **Risultato:** Trasformazione di un problema fisico in un problema di Algebra Lineare (costruzione della matrice sparsa $A$). È lo stesso approccio iniziale descritto dal professore nel progetto sul *Quantum Computing*.
-
-### B. Metodi Iterativi per Sistemi Lineari
-*   **Concetto:** Poiché la mappa geografica genererà migliaia di nodi, il sistema lineare $Ax = b$ risultante sarà troppo grande e costoso da risolvere con metodi diretti (es. Eliminazione di Gauss).
-*   **Applicazione:** Implementazione e confronto dei metodi iterativi visti a lezione, come il **Metodo del Gradiente Coniugato (CG)** o il **GMRES** (Generalized Minimal Residual method), analizzandone velocità di convergenza e residuo.
-
-### C. Minimi Quadrati e Ottimizzazione
-*   **Concetto:** Il modello PDE possiede dei parametri fisici incogniti, primo fra tutti il *Coefficiente di Diffusione* (che indica quanto velocemente le persone si spostano e portano il virus nei territori limitrofi).
-*   **Applicazione:** Avendo a disposizione i dati reali (es. casi in Lombardia vs casi in Veneto nel tempo), si definirà una funzione di costo (l'errore tra i dati predetti dalla PDE e i dati veri della Protezione Civile). Utilizzando i **Minimi Quadrati**, cercheremo numericamente il valore ottimale di questo coefficiente che minimizza l'errore, effettuando un vero e proprio *Data Fitting*.
+### B. Machine Learning per il Calcolo Scientifico (Percorso Deep Learning)
+*   **Physics-Informed Neural Networks:** Implementazione di una PINN in PyTorch.
+*   **Loss Multi-Obiettivo:** La rete neurale ottimizza contemporaneamente i pesi per "matchare" i dati reali (*Data Loss*) e per rispettare l'equazione differenziale che modella il fenomeno fisico (*Physics Loss*).
+*   **Scoperta di Parametri:** Il coefficiente fisico di diffusione diventa esso stesso un parametro addestrabile della rete, calcolato tramite la discesa del gradiente.
