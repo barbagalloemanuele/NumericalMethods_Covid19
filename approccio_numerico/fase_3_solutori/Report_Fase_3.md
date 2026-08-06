@@ -35,3 +35,6 @@ Residuo relativo finale: 9.78e-07
 Il GMRES, essendo un metodo più generalizzato e "pesante", ci impiega più iterazioni ($418$) e più tempo ($32.4$ millisecondi), dimostrando empiricamente la teoria vista a lezione: **se la matrice è Simmetrica e Definita Positiva, il CG vince sempre a mani basse.**
 
 Le soluzioni calcolate dai due metodi sono numericamente equivalenti (la differenza è dell'ordine di $10^{-3}$), confermando la bontà dell'implementazione.
+
+## Grafici di Convergenza (`visualize.py`)
+In questa cartella è presente anche lo script `visualize.py`. Il suo scopo è generare un grafico in scala semilogaritmica (standard in Analisi Numerica) che mostra visivamente quanto discusso sopra: il crollo del residuo iterazione dopo iterazione per il CG e per il GMRES. L'immagine in output (`convergenza_solutori.png`) è pronta per essere allegata alla Relazione finale.

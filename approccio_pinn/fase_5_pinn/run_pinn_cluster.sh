@@ -1,12 +1,13 @@
 #!/bin/bash
 #SBATCH --job-name=covid_pinn
-#SBATCH --account=SostituisciConTuoAccount
-#SBATCH --partition=SostituisciConTuaCoda
+#SBATCH --account=dl-course-q2
+#SBATCH --partition=dl-course-q2
+#SBATCH --nodelist=gnode10
 #SBATCH --qos=gpu-medium
-#SBATCH --mem=16G
+#SBATCH --mem=8G
 #SBATCH --cpus-per-task=2      
-#SBATCH --gres=gpu:1 --gres=shard:8000
-#SBATCH --output=logs/pinn-training-%j.log
+#SBATCH --gres=gpu:1 --gres=shard:5000
+#SBATCH --output=pinn-training-%j.log
 
 echo "Inizio addestramento intensivo della PINN su GPU Cluster..."
 

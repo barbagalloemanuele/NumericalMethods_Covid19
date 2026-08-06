@@ -33,11 +33,13 @@ def plot_convergence():
     plt.legend(fontsize=12)
     plt.tight_layout()
     
+    import os
     # Salviamo l'immagine invece di mostrarla, per compatibilità con tutti gli ambienti
-    output_filename = 'convergenza_solutori.png'
-    plt.savefig(output_filename, dpi=300)
-    print(f"Grafico di convergenza salvato con successo come '{output_filename}' nella cartella corrente.")
+    out_dir = os.path.dirname(os.path.abspath(__file__))
+    output_filename = os.path.join(out_dir, 'convergenza_solutori.png')
+    plt.savefig(output_filename, dpi=300, bbox_inches='tight')
+    print(f"Grafico di convergenza salvato con successo come 'convergenza_solutori.png' nella cartella:\n{out_dir}")
 
 if __name__ == "__main__":
-    print("--- Fase 5: Generazione Grafici Finali (Deliverables) ---\n")
+    print("--- Fase 3: Generazione Grafici Convergenza Solutori ---\n")
     plot_convergence()
