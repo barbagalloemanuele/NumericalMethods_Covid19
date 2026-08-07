@@ -1,0 +1,6 @@
+Ambiente: local
+Ottimizzatore: adam
+Epoche/Iterazioni: 100
+Tempo di training: 1.07 s
+D_scoperto: 0.9795
+Loss_finale: 5.7349e-02

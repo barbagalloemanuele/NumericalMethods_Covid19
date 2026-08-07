@@ -1,0 +1,6 @@
+Ambiente: cluster
+Ottimizzatore: lbfgs
+Epoche/Iterazioni: 7100
+Tempo di training: 131.22 s
+D_scoperto: 0.0177
+Loss_finale: 4.4173e-06

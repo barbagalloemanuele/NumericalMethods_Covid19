@@ -98,51 +98,55 @@ def run_comparison():
     pinn_results = {}
     modelli_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "approccio_pinn", "fase_5_pinn", "modelli_addestrati")
     
+    # Raccogliamo TUTTI i risultati presenti
     for env in ["local", "cluster"]:
-        result_file = os.path.join(modelli_dir, env, "result.txt")
-        if os.path.exists(result_file):
-            with open(result_file, "r") as f:
-                lines = f.readlines()
-                d_scoperto = float(lines[3].split(":")[1].strip())
-                tempo_training = float(lines[2].split(":")[1].replace("s", "").strip())
-                epoche = int(lines[1].split(":")[1].strip())
-                pinn_results[env] = {"D": d_scoperto, "tempo": tempo_training, "epoche": epoche}
+        for opt in ["adam", "lbfgs"]:
+            result_file = os.path.join(modelli_dir, env, f"result_{opt}.txt")
+            if os.path.exists(result_file):
+                with open(result_file, "r") as f:
+                    lines = f.readlines()
+                    d_scoperto = float(lines[4].split(":")[1].strip())
+                    tempo_training = float(lines[3].split(":")[1].replace("s", "").strip())
+                    epoche = int(lines[2].split(":")[1].strip())
+                    
+                    label = f"PINN\n({env.capitalize()} - {opt.upper()})"
+                    pinn_results[label] = {"D": d_scoperto, "tempo": tempo_training}
     
-    if not pinn_results:
-        print("Errore: Nessun risultato PINN trovato.")
-        return
-        
-    env_scelto = "cluster" if "cluster" in pinn_results else "local"
-    D_pinn = pinn_results[env_scelto]["D"]
-    tempo_pinn = pinn_results[env_scelto]["tempo"]
-    epoche_pinn = pinn_results[env_scelto]["epoche"]
+    labels = ["Numerico\n(L-M)"] + list(pinn_results.keys())
+    D_vals = [D_numerico] + [res["D"] for res in pinn_results.values()]
+    tempo_vals = [tempo_numerico] + [res["tempo"] for res in pinn_results.values()]
+    
+    # Generiamo una palette di colori dinamica
+    colors = ['#1f77b4'] # Il primo è sempre blu (Numerico)
+    colors += ['#d62728', '#ff7f0e', '#9467bd', '#8c564b'][:len(pinn_results)]
     
     # BAR CHART ACCURATEZZA
-    plt.figure(figsize=(10, 6))
-    bars = plt.bar(["Reale (Ground Truth)", "Metodo Numerico", f"PINN ({env_scelto.capitalize()})"], 
-                   [D_real, D_numerico, D_pinn], color=['#2ca02c', '#1f77b4', '#d62728'], edgecolor='black', linewidth=1.5)
+    plt.figure(figsize=(12, 6))
+    bars = plt.bar(labels, D_vals, color=colors, edgecolor='black', linewidth=1.5)
                    
     for bar in bars:
         yval = bar.get_height()
-        plt.text(bar.get_x() + bar.get_width()/2, yval + 0.005, f"{yval:.4f}", ha='center', va='bottom', fontsize=12, fontweight='bold')
+        if yval > 0:
+            plt.text(bar.get_x() + bar.get_width()/2, yval + 0.005, f"{yval:.4f}", ha='center', va='bottom', fontsize=12, fontweight='bold')
         
-    plt.axhline(y=D_real, color='black', linestyle='--', alpha=0.5)
+    plt.axhline(y=D_real, color='#2ca02c', linestyle='--', linewidth=2, label=f"Reale (Ground Truth): {D_real:.4f}")
     plt.title("Accuratezza: Scoperta del Coefficiente di Diffusione (D)", fontsize=15, weight='bold')
     plt.ylabel("Valore del Parametro D", fontsize=12)
-    plt.ylim(0, max(D_real, D_numerico, D_pinn) * 1.3)
+    plt.ylim(0, max(max(D_vals), D_real) * 1.3)
+    plt.legend()
     
     out_dir = os.path.dirname(os.path.abspath(__file__))
     plt.savefig(os.path.join(out_dir, "confronto_accuratezza.png"), dpi=300, bbox_inches='tight')
     plt.close()
     
     # BAR CHART TEMPI
-    plt.figure(figsize=(8, 5))
-    bars2 = plt.bar(["Metodo Numerico (L-M)", f"PINN ({epoche_pinn} epoche)"], 
-                   [tempo_numerico, tempo_pinn], color=['#1f77b4', '#d62728'], edgecolor='black', linewidth=1.5)
+    plt.figure(figsize=(12, 5))
+    bars2 = plt.bar(labels, tempo_vals, color=colors, edgecolor='black', linewidth=1.5)
                    
     for bar in bars2:
         yval = bar.get_height()
-        plt.text(bar.get_x() + bar.get_width()/2, yval + (tempo_pinn*0.02), f"{yval:.2f} s", ha='center', va='bottom', fontsize=12, fontweight='bold')
+        if yval > 0:
+            plt.text(bar.get_x() + bar.get_width()/2, yval + (yval*0.05), f"{yval:.2f} s", ha='center', va='bottom', fontsize=12, fontweight='bold')
         
     plt.title("Confronto Tempi Computazionali (Log Scale)", fontsize=15, weight='bold')
     plt.ylabel("Tempo (Secondi)", fontsize=12)
@@ -151,7 +155,7 @@ def run_comparison():
     plt.savefig(os.path.join(out_dir, "confronto_tempi.png"), dpi=300, bbox_inches='tight')
     plt.close()
     
-    print("\n--- Confronto Completato! Sono stati generati 4 grafici con estetica moderna. ---")
+    print(f"\n--- Confronto Completato! Trovati {len(pinn_results)} risultati PINN. ---")
 
 if __name__ == "__main__":
     run_comparison()

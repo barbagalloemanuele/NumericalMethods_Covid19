@@ -11,7 +11,16 @@
 
 echo "Inizio addestramento intensivo della PINN su GPU Cluster..."
 
-# Eseguiamo il codice Python tramite l'immagine Apptainer con 50.000 epoche
-apptainer run --nv /shared/sifs/latest.sif python approccio_pinn/fase_5_pinn/pinn_solver.py --epochs 50000 --env cluster
+# Run 1: Ottimizzatore Adam (Primo Ordine)
+echo "------------------------------------------------------"
+echo "Inizio addestramento PINN con ADAM (50,000 epoche)..."
+apptainer run --nv /shared/sifs/latest.sif python approccio_pinn/fase_5_pinn/pinn_solver.py --epochs 50000 --env cluster --optimizer adam
 
-echo "Addestramento completato. Controlla la cartella 'modelli_addestrati' per il file .pth"
+# Run 2: Ottimizzatore L-BFGS (Secondo Ordine)
+echo "------------------------------------------------------"
+echo "Inizio addestramento PINN con L-BFGS (2.500 epoche limite, con stop anticipato per convergenza iterazioni interne)..."
+# Per L-BFGS usiamo meno "epoche" perché la closure valuta la funzione 20 volte a step
+apptainer run --nv /shared/sifs/latest.sif python approccio_pinn/fase_5_pinn/pinn_solver.py --epochs 50000 --env cluster --optimizer lbfgs
+
+echo "------------------------------------------------------"
+echo "Addestramento completato. Controlla la cartella 'modelli_addestrati/cluster' per i risultati."

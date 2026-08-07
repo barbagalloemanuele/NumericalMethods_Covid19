@@ -1,0 +1,6 @@
+Ambiente: local
+Ottimizzatore: lbfgs
+Epoche/Iterazioni: 105
+Tempo di training: 5.93 s
+D_scoperto: 0.0147
+Loss_finale: 4.9346e-02

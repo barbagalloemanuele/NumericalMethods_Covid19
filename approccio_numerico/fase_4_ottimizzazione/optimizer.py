@@ -1,5 +1,7 @@
 import numpy as np
 from scipy.optimize import least_squares
+import matplotlib.pyplot as plt
+import os
 
 # ---------------------------------------------------------
 # Funzioni MOCK per dimostrare la logica di calibrazione
@@ -31,6 +33,8 @@ def get_real_data():
 # Cuore dell'Ottimizzazione: Minimi Quadrati
 # ---------------------------------------------------------
 
+D_history = []
+
 def cost_function(D_array, real_data):
     """
     La funzione obiettivo/costo. Calcola i residui.
@@ -40,6 +44,7 @@ def cost_function(D_array, real_data):
     quadrati di questo vettore non sarà minima (zero).
     """
     D_guess = D_array[0]
+    D_history.append(D_guess)
     simulated_data = simulate_diffusion(D_guess)
     return simulated_data - real_data
 
@@ -65,3 +70,22 @@ if __name__ == "__main__":
     
     if abs(res.x[0] - 0.35) < 1e-4:
         print("\nSUCCESSO! L'algoritmo ha individuato matematicamente il parametro corretto (0.35) basandosi solo sull'osservazione dei dati finali.")
+        
+    # --- Generazione Grafico Convergenza LM ---
+    plt.style.use('seaborn-v0_8-darkgrid')
+    plt.figure(figsize=(9, 5))
+    
+    plt.plot(range(1, len(D_history) + 1), D_history, marker='o', linestyle='-', color='#1f77b4', linewidth=2, label='D Stimato (L-M)')
+    plt.axhline(y=0.35, color='#2ca02c', linestyle='--', linewidth=2, label='D Reale (0.35)')
+    
+    plt.title("Convergenza Ottimizzatore Levenberg-Marquardt", fontsize=14, weight='bold')
+    plt.xlabel("Iterazioni (Valutazioni Funzione)", fontsize=12)
+    plt.ylabel("Valore del Parametro D", fontsize=12)
+    plt.legend()
+    plt.tight_layout()
+    
+    out_dir = os.path.dirname(os.path.abspath(__file__))
+    plt.savefig(os.path.join(out_dir, "lm_convergence.png"), dpi=300)
+    plt.close()
+    
+    print("Grafico di convergenza generato: 'lm_convergence.png'.")

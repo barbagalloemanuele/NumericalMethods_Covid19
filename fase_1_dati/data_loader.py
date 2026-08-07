@@ -1,5 +1,9 @@
 import pandas as pd
 import numpy as np
+import io
+import requests
+import os
+import matplotlib.pyplot as plt
 
 def fetch_and_preprocess_data():
     """Fetches COVID-19 provincial data and filters for the First Wave."""
@@ -19,7 +23,26 @@ def fetch_and_preprocess_data():
     df = df.dropna(subset=['lat', 'long'])
     df = df[(df['lat'] != 0) & (df['long'] != 0)]
     
+    # Generazione grafico dati grezzi (aggregando l'intera Italia per data)
+    italia_ts = df.groupby('data')['totale_casi'].sum().reset_index()
+    
+    plt.style.use('seaborn-v0_8-darkgrid')
+    plt.figure(figsize=(10, 5))
+    plt.plot(italia_ts['data'].dt.date, italia_ts['totale_casi'], marker='o', linestyle='-', color='#d62728', markersize=4)
+    plt.title("Andamento Contagi (Totale Casi) - Prima Ondata (Feb-Mag 2020)", fontsize=14, weight='bold')
+    plt.xlabel("Data", fontsize=12)
+    plt.ylabel("Numero di Positivi", fontsize=12)
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    
+    out_dir = os.path.dirname(os.path.abspath(__file__))
+    plt.savefig(os.path.join(out_dir, "covid_raw_data.png"), dpi=300)
+    plt.close()
+    
+    print("Grafico dei dati storici generato: 'covid_raw_data.png'.")
+    
     return df
+
 
 def create_spatial_grid(df, grid_size=(50, 50)):
     """

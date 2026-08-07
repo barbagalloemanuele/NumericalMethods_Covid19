@@ -27,3 +27,5 @@ Il progetto copre trasversalmente quasi tutto il programma del corso, unendo i v
 *   **Physics-Informed Neural Networks:** Implementazione di una PINN in PyTorch.
 *   **Loss Multi-Obiettivo:** La rete neurale ottimizza contemporaneamente i pesi per "matchare" i dati reali (*Data Loss*) e per rispettare l'equazione differenziale che modella il fenomeno fisico (*Physics Loss*).
 *   **Scoperta di Parametri:** Il coefficiente fisico di diffusione diventa esso stesso un parametro addestrabile della rete, calcolato tramite la discesa del gradiente.
+
+> **NOTA PER LA LETTURA:** All'interno di ogni cartella di fase (`fase_1...`, `fase_2...`, ecc.) è presente un file `Report_Fase_X.md`. Questi report fungono da capitoli della tesi e contengono una **spiegazione esplicativa dettagliata e riga-per-riga** di tutto il codice sorgente, analizzando le motivazioni matematiche dietro ogni scelta (es. perché usare la Tanh invece della ReLU, come funziona l'Autograd rispetto allo Stencil a 5 punti, ecc.).

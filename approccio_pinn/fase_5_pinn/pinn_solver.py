@@ -87,82 +87,108 @@ def generate_mock_data(num_points=1000):
     
     return x, y, t, u
 
-def train_pinn(epochs=1000, lr=1e-3, device='cpu', env='local'):
-    print(f"--- Avvio Training PINN su {str(device).upper()} (Ambiente: {env}) ---")
+def train_pinn(epochs=1000, lr=1e-3, device='cpu', env='local', opt_type='adam'):
+    print(f"--- Avvio Training PINN su {str(device).upper()} (Ambiente: {env} | Ottimizzatore: {opt_type.upper()}) ---")
     
     model = PINN().to(device)
-    optimizer = optim.Adam(model.parameters(), lr=lr)
+    
+    # Setup Ottimizzatore
+    if opt_type == 'adam':
+        optimizer = optim.Adam(model.parameters(), lr=lr)
+    elif opt_type == 'lbfgs':
+        # L-BFGS è un ottimizzatore del secondo ordine molto esigente. 
+        # Riduciamo le epoche "reali" del loop perché ogni iterazione fa molteplici step interni.
+        optimizer = optim.LBFGS(model.parameters(), lr=0.1, max_iter=20, tolerance_grad=1e-5, tolerance_change=1e-9, history_size=100)
+        # Per L-BFGS una "epoca" del nostro loop corrisponde a molte chiamate
+        epochs = epochs // 20 if epochs > 20 else 1 
+    else:
+        raise ValueError("Ottimizzatore non supportato.")
     
     # 1. Dati Storici (Data Points)
-    # Simula i punti estratti dal CSV in Fase 1
     x_data, y_data, t_data, u_data = generate_mock_data(500)
     x_data, y_data, t_data, u_data = x_data.to(device), y_data.to(device), t_data.to(device), u_data.to(device)
     
     # 2. Punti di Collocazione (Physics Points)
-    # Punti causali nel dominio spazio-temporale usati solo per far rispettare l'equazione differenziale
     x_phys, y_phys, t_phys, _ = generate_mock_data(2000)
     x_phys, y_phys, t_phys = x_phys.to(device), y_phys.to(device), t_phys.to(device)
     
     start_time = time.time()
     
+    global iter_count
+    iter_count = 0
+    final_loss = 0.0
+
     for epoch in range(1, epochs + 1):
-        optimizer.zero_grad()
-        
-        # --- LOSS SUI DATI REALI ---
-        u_pred = model(x_data, y_data, t_data)
-        loss_data = torch.mean((u_pred - u_data)**2)
-        
-        # --- LOSS SULLA FISICA (PDE) ---
-        loss_phys = compute_physics_loss(model, x_phys, y_phys, t_phys)
-        
-        # --- LOSS TOTALE MULTI-OBIETTIVO ---
-        loss = loss_data + loss_phys
-        
-        loss.backward()
-        optimizer.step()
-        
-        # Loggare il progresso
-        if epoch % 100 == 0 or epoch == 1:
-            print(f"Epoch {epoch:4d}/{epochs} | Loss Totale: {loss.item():.4f} (Dati: {loss_data.item():.4f}, Fisica: {loss_phys.item():.4f}) | Parametro Scoperto D: {model.D.item():.4f}")
+        if opt_type == 'adam':
+            optimizer.zero_grad()
+            u_pred = model(x_data, y_data, t_data)
+            loss_data = torch.mean((u_pred - u_data)**2)
+            loss_phys = compute_physics_loss(model, x_phys, y_phys, t_phys)
+            loss = loss_data + loss_phys
+            loss.backward()
+            optimizer.step()
+            final_loss = loss.item()
             
+            if epoch % 100 == 0 or epoch == 1:
+                print(f"Epoch {epoch:4d}/{epochs} | Loss Totale: {loss.item():.4f} | Parametro D: {model.D.item():.4f}")
+                
+        elif opt_type == 'lbfgs':
+            def closure():
+                global iter_count
+                optimizer.zero_grad()
+                u_pred = model(x_data, y_data, t_data)
+                loss_data = torch.mean((u_pred - u_data)**2)
+                loss_phys = compute_physics_loss(model, x_phys, y_phys, t_phys)
+                loss = loss_data + loss_phys
+                loss.backward()
+                iter_count += 1
+                if iter_count % 100 == 0:
+                    print(f"Iter {iter_count} | Loss Totale: {loss.item():.4e} | Parametro D: {model.D.item():.4f}")
+                return loss
+            
+            optimizer.step(closure)
+            final_loss = closure().item()
+
     end_time = time.time()
     train_time = end_time - start_time
     d_scoperto = model.D.item()
     
-    print(f"\nTraining completato in {train_time:.2f} secondi.")
+    # Calcolo totale epoche/iterazioni per il print
+    total_iters = epochs if opt_type == 'adam' else iter_count
+    
+    print(f"\nTraining completato in {train_time:.2f} secondi ({opt_type.upper()}).")
     print(f"==================================================")
     print(f"   Valore D scoperto dalla PINN: {d_scoperto:.4f}")
     print(f"   Valore D reale (Protezione Civile): 0.3500")
     print(f"==================================================")
     
-    # Salvataggio del Modello in cartelle strutturate per ambiente
+    # Salvataggio del Modello differenziato per ottimizzatore
     save_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "modelli_addestrati", env)
     os.makedirs(save_dir, exist_ok=True)
     
-    save_path = os.path.join(save_dir, "pinn_model.pth")
-    torch.save(model.state_dict(), save_path)
+    torch.save(model.state_dict(), os.path.join(save_dir, f"pinn_model_{opt_type}.pth"))
     
-    result_path = os.path.join(save_dir, "result.txt")
+    result_path = os.path.join(save_dir, f"result_{opt_type}.txt")
     with open(result_path, "w") as f:
         f.write(f"Ambiente: {env}\n")
-        f.write(f"Epoche: {epochs}\n")
+        f.write(f"Ottimizzatore: {opt_type}\n")
+        f.write(f"Epoche/Iterazioni: {total_iters}\n")
         f.write(f"Tempo di training: {train_time:.2f} s\n")
         f.write(f"D_scoperto: {d_scoperto:.4f}\n")
-        f.write(f"Loss_finale: {loss.item():.4e}\n")
+        f.write(f"Loss_finale: {final_loss:.4e}\n")
         
-    print(f"\nOutput salvati con successo in:\n-> {save_dir}")
-    
+    print(f"\nOutput salvati con successo in:\n-> {result_path}")
     return model
 
 import argparse
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Addestramento PINN per diffusione spaziale.")
-    parser.add_argument("--epochs", type=int, default=1000, help="Numero di epoche per l'addestramento.")
-    parser.add_argument("--env", type=str, choices=["local", "cluster"], default="local", help="Ambiente di esecuzione per separare gli output.")
+    parser.add_argument("--epochs", type=int, default=1000, help="Numero base di epoche/iterazioni.")
+    parser.add_argument("--env", type=str, choices=["local", "cluster"], default="local")
+    parser.add_argument("--optimizer", type=str, choices=["adam", "lbfgs"], default="adam", help="Ottimizzatore da utilizzare.")
     args = parser.parse_args()
 
-    # Rilevamento automatico per usare l'accelerazione hardware disponibile
     if torch.backends.mps.is_available():
         device = torch.device("mps")
     elif torch.cuda.is_available():
@@ -170,4 +196,4 @@ if __name__ == "__main__":
     else:
         device = torch.device("cpu")
         
-    train_pinn(epochs=args.epochs, lr=1e-3, device=device, env=args.env)
+    train_pinn(epochs=args.epochs, lr=1e-3, device=device, env=args.env, opt_type=args.optimizer)
