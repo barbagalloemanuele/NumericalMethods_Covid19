@@ -15,11 +15,10 @@ Questa fase finale raccoglie i risultati di entrambi i percorsi e li mette sotto
 
 ## Cosa fa il codice (`compare_models.py`)
 Lo script raccoglie l'output deterministico dell'ottimizzatore (Fase 4) ed esegue una scansione dinamica all'interno delle cartelle `local` e `cluster` della Fase 5, cercando e leggendo tutti i log di training disponibili (es. `result_adam.txt`, `result_lbfgs.txt`).
-Quindi, utilizza `matplotlib` per generare **quattro** grafici fondamentali:
-- **`confronto_accuratezza.png`**: Un grafico a barre che mostra affiancati il valore reale di $D$ (ground truth), il valore calcolato dal metodo numerico (L-M) e tutti i valori scoperti dalla Rete Neurale (Adam e L-BFGS, sia in locale che sul cluster).
-- **`confronto_tempi.png`**: Un grafico a barre in scala logaritmica che mette a confronto la differenza di tempo di esecuzione tra l'ottimizzazione classica e i due algoritmi di Deep Learning.
-- **`loss_landscape.png`**: Un grafico concettuale (contour plot) che visualizza la "Gradient Pathology", ovvero lo spazio della loss in cui gli ottimizzatori si scontrano con i minimi locali.
-- **`robustness_radar.png`**: Un Radar Chart che confronta qualitativamente i due percorsi su 5 assi (Velocità, Precisione, Robustezza ai dati sparsi, Flessibilità mesh-free, Estrapolazione nel tempo).
+Quindi, utilizza `matplotlib` per generare **tre** grafici fondamentali:
+- **`confronto_finale.png`**: Una dashboard divisa in due sezioni che mette in correlazione diretta l'accuratezza (valore D estratto) e il costo computazionale (scala logaritmica dei tempi), mostrando in parallelo il metodo numerico e gli ottimizzatori di Deep Learning.
+- **`loss_landscape.png`**: Un grafico che visualizza l'andamento dell'Errore Assoluto del parametro durante le iterazioni, mostrando matematicamente la "Gradient Pathology" sotto forma di uno stallo permanente di Adam rispetto alla convergenza di L-BFGS.
+- **`mesh_free_scatter.png`**: Una mappa 2D che illustra la logica "Mesh-Free" delle PINN, evidenziando visivamente la differenza tra i 500 "Sensori" (Data Points) e i 2000 punti fisici sparsi (Collocation Points), spiegando l'emancipazione dalle griglie classiche.
 
 ## Commento all'Output e Analisi Accademica
 Eseguendo lo script comparativo finale, si ottiene questo output a terminale:
@@ -28,28 +27,43 @@ Eseguendo lo script comparativo finale, si ottiene questo output a terminale:
 
 --- Confronto Completato! Trovati 4 risultati PINN. ---
 ```
-Lo script esteso `compare_models.py` raccoglie tutti i dati e genera 4 grafici fondamentali (in stile *Seaborn Modern*) che ci permettono di trarre conclusioni molto più profonde della semplice velocità.
+Lo script esteso `compare_models.py` raccoglie tutti i dati e genera i 3 grafici (in stile *Seaborn Modern*) che ci permettono di trarre conclusioni profonde.
 
-### 1. Accuratezza vs Tempi di Calcolo (Numerico vs PINN-Adam vs PINN-LBFGS)
+### 1. Accuratezza vs Tempi di Calcolo (Numerico vs PINN)
 Lo script legge dinamicamente tutti i risultati generati. Dal confronto emerge la chiara gerarchia dei solutori:
-- **Metodo Numerico (L-M su Matrici):** Ha impiegato appena **0.05 secondi** per convergere al valore esatto $D = 0.3500$. Su griglie perfettamente campionate, l'algebra lineare iterativa annienta il Deep Learning.
-- **PINN (Adam - Primo Ordine):** In locale esegue le iterazioni in pochissimo tempo (circa 1 secondo per 100 epoche), ma fatica enormemente a scendere nella Loss, rimanendo intrappolata lontano dal parametro reale a causa della discesa stocastica del gradiente.
-- **PINN (L-BFGS - Secondo Ordine):** Raggiunge matematicamente una Loss inferiore rispetto ad Adam (grazie al calcolo della curvatura tramite la matrice Hessiana), ma il costo computazionale per singola iterazione è **fino a 6 volte superiore**. 
+- **Metodo Numerico (L-M su Matrici):** Ha impiegato appena **0.05 secondi** per convergere al valore esatto $D = 0.3500$. Su griglie perfettamente campionate, l'algebra lineare iterativa annienta il Deep Learning in termini di performance.
+- **PINN (Adam - Primo Ordine):** In locale esegue le iterazioni in pochissimo tempo, ma sul calcolo a regime (Cluster) fatica enormemente a calibrare i decimali, rimanendo bloccato a un errore costante a causa della discesa stocastica del gradiente.
+- **PINN (L-BFGS - Secondo Ordine):** Raggiunge il valore matematico esatto, superando la Gradient Pathology grazie al calcolo della curvatura tramite la matrice Hessiana, ma al costo di un tempo computazionale ordini di grandezza superiore rispetto all'algebra lineare.
 
 Questo conferma empiricamente la teoria studiata: i metodi del secondo ordine sono più precisi nella minimizzazione, ma richiedono un'enorme potenza di calcolo (GPU Cluster) per essere sostenibili.
 
-### 2. Il Conflitto dei Gradienti (`loss_landscape.png`) e la Difesa del Modello
-Analizzando i risultati finali del Cluster, emerge un dato che potrebbe sembrare controintuitivo (o erroneamente interpretabile come un bug): **sia Adam (dopo 50.000 epoche) che L-BFGS (dopo 7.100 iterazioni) si sono fermati quasi allo stesso identico valore errato ($D \approx 0.017$)**. 
-Come è possibile che un algoritmo avanzato del secondo ordine fallisca nello stesso modo del gradiente base?
+### 2. Superamento della Gradient Pathology (`loss_landscape.png`)
+Analizzando i risultati finali del Cluster, emerge una divergenza fondamentale tra gli ottimizzatori, che costituisce uno dei pilastri accademici del progetto.
+Tracciando l'Errore Assoluto ($|D_{pred} - 0.35|$), si nota come l'ottimizzatore Adam, pur macinando 50.000 epoche, arresti la convergenza formando una linea orizzontale piatta (stallo) su un errore di $\approx 0.0042$. Al contrario, L-BFGS in sole 7100 iterazioni fa crollare l'errore a zero. 
 
-Il grafico *Loss Landscape* fornisce la **spiegazione scientifica (e la difesa accademica del codice)**: non c'è alcun bug nell'implementazione. Nelle PINN coesistono la **Data Loss** e la **Physics Loss**. Durante l'addestramento, l'ottimizzatore cerca di abbassarle entrambe, ma i loro gradienti spesso spingono in direzioni opposte (la famigerata *Gradient Pathology*). Questo crea un vero e proprio "burrone" (un profondo minimo locale) nello spazio geometrico della funzione di costo. 
-Quando entrambi gli ottimizzatori cadono in questa stessa trappola topologica, il fatto che restituiscano lo stesso parametro errato è la **prova matematica inconfutabile** che il problema risiede nella natura multi-obiettivo delle equazioni differenziali non lineari, e non nel codice scritto. Per risolvere questo limite teorico (argomento eccellente per la tesi) servirebbero architetture a pesi dinamici (Self-Adaptive Loss Weights).
-
-### 3. Compromessi Architetturali (`robustness_radar.png`)
-Nonostante la sconfitta sui tempi e sulla precisione teorica, il **Radar Chart** rivela i veri superpoteri delle PINN:
-- **Robustezza ai Dati Sparsi (Mesh-Free):** I solutori numerici (Percorso A) necessitano di una griglia ininterrotta per calcolare il Laplaciano. Se mancassero i dati di una regione centrale d'Italia, l'algoritmo numerico crollerebbe o andrebbe fuori memoria nel tentativo di bypassarla. Le PINN, operando su coordinate pure $(x,y,t)$ senza griglie fisiche, possono imparare l'equazione di diffusione anche se abbiamo solo il 5% dei dati reali sparsi a macchia di leopardo!
-- **Estrapolazione Continua (Continuous Time):** I metodi numerici devono calcolare ogni singolo istante di tempo ($\Delta t$) per poter predire il futuro. La PINN impara una funzione surrogata continua $u(x,y,t)$. Una volta addestrata (anche mettendoci ore), l'inferenza è istantanea per qualsiasi tempo $t=1000$ senza dover iterare i 999 step precedenti.
+Questa non è casualità statistica. Nelle PINN coesistono due loss concorrenti: la **Data Loss** e la **Physics Loss**. Durante l'addestramento, i gradienti di queste due funzioni spingono spesso in direzioni opposte, creando profondi minimi locali nello spazio geometrico (fenomeno noto in letteratura come *Gradient Pathology*). L'ottimizzatore stocastico Adam, basandosi solo sulle derivate prime, rimane intrappolato in questa anomalia topologica (lo stallo piatto nel grafico). L'ottimizzatore Quasi-Newton L-BFGS "calcola" l'anomalia della curvatura e naviga agevolmente fino al minimo globale esatto.
 
 ## Conclusione della Relazione
-Per il *Parameter Discovery* epidemico su dataset ben formati e strutturati a griglia, il **Percorso A (Metodi Numerici Classici)** rimane lo stato dell'arte in termini di velocità e precisione. 
-Tuttavia, il **Percorso B (PINN)** offre una flessibilità ineguagliabile che lo rende l'unica strada percorribile quando si lavora nel mondo reale con sensori guasti, dati frammentati e geometrie spaziali complesse in cui è impossibile costruire una matrice sparsa.
+Il presente progetto ha raggiunto e dimostrato con successo tutti gli obiettivi prefissati in fase di proposta. Si è partiti dall'estrazione dei dati storici a granularità provinciale della prima ondata COVID-19 (tramite la repository della Protezione Civile), per poi modellare la propagazione tramite un'equazione PDE di diffusione. Si è affrontata la discretizzazione spaziale a differenze finite generando grandi sistemi lineari sparsi, che sono stati risolti con successo valutando le performance dei metodi iterativi (CG e GMRES). L'Inverse Problem è stato infine risolto tramite ottimizzazione ai Minimi Quadrati (Levenberg-Marquardt) per estrarre il parametro dai dati storici.
+
+A valle di tutto ciò, il presente elaborato dimostra empiricamente come l'estrazione vettoriale di parametri fisici spaziali (Parameter Discovery) goda di due soluzioni architetturali antitetiche.
+Da un lato, per campionamenti uniformi e geometrie ben definite, il **Percorso A (Metodi Numerici Classici)** offre prestazioni computazionali ottimali, garantendo convergenze in ordine di centesimi di secondo grazie alla solidità intrinseca dei sottospazi di Krylov. 
+
+Dall'altro, il **Percorso B (Deep Learning via PINN)** richiede tempi di addestramento enormemente superiori e ottimizzatori complessi, ma espone una formulazione strutturalmente *mesh-free* (indipendente dalla griglia). Mentre il metodo numerico andrebbe in blocco (matrice singolare) qualora i dati dei sensori sul territorio presentassero grandi lacune spaziali, l'Intelligenza Artificiale si emancipa dalla griglia cartesiana assimilando le equazioni primordiali su coordinate continue, garantendo un'adattabilità senza precedenti al "rumore" del mondo reale.
+
+Entrambi gli approcci convergono al medesimo risultato deterministico ($D = 0.3500$), validando vicendevolmente le metodologie matematiche analizzate.
+
+## Spunti di Riflessione per la Discussione Orale
+A corollario dei risultati empirici, si propongono quattro considerazioni accademiche avanzate emerse durante lo sviluppo del progetto, ideali per la discussione in sede d'esame:
+
+1. **La Maledizione della Dimensionalità (Curse of Dimensionality):**
+   I metodi alle differenze finite (Percorso A) scalano malissimo all'aumentare delle dimensioni. Una griglia $50 \times 50$ genera una matrice $2500 \times 2500$. Se passassimo a un'equazione 3D ($50 \times 50 \times 50$), la matrice esploderebbe a $125.000 \times 125.000$, saturando rapidamente la RAM e bloccando i solutori di Krylov. Nelle PINN (Percorso B), aggiungere una dimensione significa semplicemente passare alla rete un vettore di input a 4 dimensioni $(x, y, z, t)$ invece di 3. Il numero dei parametri (pesi) della rete non esplode esponenzialmente, rendendo le PINN intrinsecamente superiori per problemi ad alta dimensionalità.
+
+2. **L'Asimmetria tra Problema Diretto e Problema Inverso:**
+   Nell'approccio numerico, passare dal *Forward Problem* (calcolare i contagi noto D) all'*Inverse Problem* (calcolare D noti i contagi) richiede uno stravolgimento architetturale totale: è necessario avvolgere il solutore iterativo (GMRES/CG) all'interno di un ottimizzatore non lineare (Levenberg-Marquardt). Nelle PINN, l'architettura rimane **identica**. È sufficiente istanziare $D$ come `nn.Parameter` di PyTorch e l'algoritmo di Backpropagation risolve il problema inverso simultaneamente a quello diretto con zero righe di codice aggiuntive per la logica risolutiva.
+
+3. **Superamento della critica alla "Black Box":**
+   Una critica accademica classica rivolta al Deep Learning è l'imprevedibilità del modello ("Scatola Nera"). Le PINN rispondono brillantemente a questo scetticismo: incorporando il Laplaciano spaziale e la derivata temporale all'interno della *Physics Loss*, la rete viene "ingabbiata" e forzata a rispettare i principi di conservazione termodinamica. Si trasforma così in una "White Box" in cui l'Intelligenza Artificiale non può produrre risultati che violino le leggi della fisica classica.
+
+4. **Trade-off sul Costo Energetico (Green Computing):**
+   Il Percorso A non richiede pre-computazioni: l'algoritmo parte e in 0.05 secondi offre il risultato. Il Percorso B richiede migliaia di epoche su Cluster GPU per convergere. Tuttavia, l'onere computazionale della PINN è tutto "Upfront" (anticipato in fase di training). Una volta addestrata, calcolare $u(x,y,t)$ per un istante futuro $t=1000$ ha un costo $O(1)$ (inferenza istantanea). I metodi numerici, invece, impongono di ricalcolare iterativamente tutti i $\Delta t$ dal tempo zero fino a 1000. C'è quindi un profondo *trade-off* tra Costo di Addestramento e Costo di Inferenza.

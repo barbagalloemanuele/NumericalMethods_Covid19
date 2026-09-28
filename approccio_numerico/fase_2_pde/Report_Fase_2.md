@@ -11,20 +11,60 @@ Questa è la prima fase del *Percorso A* ed è isolata per trattare esclusivamen
 ## Cosa bisogna fare in questa fase
 Questa è la fase più "matematica" del progetto. Il modello epidemico si basa su un'Equazione alle Derivate Parziali (PDE) spaziale (l'equazione di diffusione). I computer non sanno risolvere equazioni continue; dobbiamo trasformarle in un gigantesco sistema lineare $Ax = b$.
 
-Per farlo, usiamo il metodo delle **Differenze Finite**. Il Laplaciano spaziale 2D ($\nabla^2$) viene approssimato calcolando la differenza tra i contagi in un "pixel" e i suoi 4 pixel adiacenti (Nord, Sud, Est, Ovest). Questo procedimento genera una matrice quadrata enorme: la **Matrice A**.
+## Fondamenti Matematici: Da Continuo a Discreto
+Poiché il corso è "Numerical Methods for Scientific Computing", è fondamentale dominare la teoria matematica dietro al codice. Il nostro modello epidemico si basa su un'Equazione alle Derivate Parziali (PDE) di Diffusione:
 
-## Spiegazione Dettagliata del Codice (`pde_discretization.py`)
-Lo script esegue l'operazione fondamentale dell'approccio numerico: **costruisce la matrice A** (Laplaciano) evitando memory overflow tramite la libreria `scipy.sparse`.
+$$ \frac{\partial u}{\partial t} = D \nabla^2 u $$
 
-### La costruzione delle Diagonali
-Il Laplaciano 2D a differenze finite (stencil a 5 punti) si traduce in una matrice enorme in cui le uniche informazioni utili giacciono su 5 diagonali specifiche:
-- **`main_diag = -4.0 * np.ones(N)`**: La diagonale principale contiene tutti -4. Rappresenta il decadimento o la perdita di concentrazione del virus dal punto centrale verso le celle adiacenti.
-- **`off_diag_x = np.ones(N - 1)`**: Le diagonali immediatamente sopra e sotto quella principale contengono gli 1. Rappresentano lo scambio col vicino di Destra e di Sinistra sull'asse X.
-- **`off_diag_x[nx-1::nx] = 0.0`**: Questo dettaglio di codice è fondamentale. Poiché abbiamo appiattito una griglia 2D in un vettore 1D (riordinamento lessicografico), il "bordo destro" della riga 1 non confina col "bordo sinistro" della riga 2. Inserire gli zero annulla matematicamente il contagio "attraverso il bordo della mappa".
-- **`off_diag_y = np.ones(N - nx)`**: Queste diagonali, posizionate a distanza $nx$ dalla principale, connettono un pixel col suo vicino a Nord e a Sud (asse Y).
+Dove $u$ è il numero di contagiati e $D$ è il coefficiente di diffusione. I computer non sanno risolvere equazioni continue; dobbiamo trasformarle in un gigantesco sistema lineare $Ax = b$. Per farlo, esaminiamo i tre concetti chiave:
 
-### Assemblaggio Sparso (`sp.diags`)
-- **`A = sp.diags(diagonals, offsets, shape=(N, N), format='csr')`**: Invece di creare una matrice di zeri grande $2500 \times 2500$ e inserire i numeri (che consumerebbe gigabyte di RAM se la mappa fosse più fitta), ordiniamo al computer di allocare in memoria **esclusivamente** le 5 diagonali, "comprimendo" tutto il resto in formato CSR (*Compressed Sparse Row*). Il formato CSR è lo standard aureo per far volare le prestazioni dei solutori iterativi nella fase successiva.
+### 1. Il Laplaciano Spaziale 2D ($\nabla^2$)
+Il Laplaciano è un operatore matematico differenziale. In due dimensioni, è definito come la somma delle derivate parziali seconde spaziali:
+$$ \nabla^2 u = \frac{\partial^2 u}{\partial x^2} + \frac{\partial^2 u}{\partial y^2} $$
+Fisicamente, la derivata seconda misura la "concavità". Il Laplaciano ci dice se in un punto c'è un accumulo (i vicini hanno più contagi, quindi il virus fluirà verso di noi) o una dispersione (noi abbiamo più contagi dei vicini, quindi il virus fluirà via da noi).
+
+### 2. Le Differenze Finite (Sviluppo di Taylor)
+Per tradurre la derivata seconda in algebra per il computer, la Analisi Numerica utilizza lo **Sviluppo in Serie di Taylor**. Se vogliamo calcolare la derivata seconda in un punto $x_i$, prendiamo il punto successivo ($x_{i+1}$) e il precedente ($x_{i-1}$). Troncando la serie di Taylor al secondo ordine, otteniamo l'approssimazione alle Differenze Finite Centrali:
+$$ \frac{\partial^2 u}{\partial x^2} \approx \frac{u_{i+1, j} - 2u_{i,j} + u_{i-1, j}}{\Delta x^2} $$
+Questa formula calcola l'influenza dell'asse Est-Ovest. Facendo la stessa operazione sull'asse Y (Nord-Sud), otteniamo:
+$$ \frac{\partial^2 u}{\partial y^2} \approx \frac{u_{i, j+1} - 2u_{i,j} + u_{i, j-1}}{\Delta y^2} $$
+
+### 3. Lo Stencil a 5 punti
+Se assumiamo che la nostra griglia 50x50 abbia pixel perfettamente quadrati ($\Delta x = \Delta y = h$), possiamo sommare le due formule trovate sopra per ottenere l'approssimazione completa del Laplaciano:
+$$ \nabla^2 u \approx \frac{u_{i+1, j} + u_{i-1, j} + u_{i, j+1} + u_{i, j-1} - 4u_{i,j}}{h^2} $$
+Ecco la genesi della matematica del codice! Da questa formula, che unisce il punto centrale $(i,j)$ e i suoi 4 vicini diretti, nascono i famosi coefficienti della nostra matrice:
+- **-4** per il nodo centrale $u_{i,j}$ (la diagonale principale `main_diag`)
+- **+1** per i nodi adiacenti (le diagonali secondarie `off_diag_x` e `off_diag_y`).
+Questa struttura geometrica a croce prende il nome tecnico di **Stencil a 5 punti**.
+
+## Spiegazione del Codice Riga per Riga (`pde_discretization.py`)
+Lo script traduce la mappa d'Italia (matematica continua) in una matrice calcolabile dal computer. Ecco cosa accade riga per riga:
+
+- **`Riga 11: N = nx * ny`**
+  Calcola il numero totale di pixel (50 * 50 = 2500). La nostra matrice finale $A$ sarà quindi quadrata e di dimensioni 2500x2500.
+- **`Riga 14: main_diag = -4.0 * np.ones(N)`**
+  Crea un array lungo 2500 pieno di `-4.0`. Questa sarà la *diagonale principale* della matrice. Nello Stencil a 5 punti, il -4 rappresenta il pixel "centrale" da cui i contagi defluiscono verso i vicini.
+- **`Riga 17: off_diag_x = np.ones(N - 1)`**
+  Crea un array lungo 2499 pieno di `1.0`. Queste sono le connessioni "Est e Ovest" (destra e sinistra) per ogni pixel.
+- **`Riga 19: off_diag_x[nx-1::nx] = 0.0`**
+  Questa riga risolve il "Teletrasporto". Poiché abbiamo appiattito una mappa 2D in un vettore 1D, il bordo Est della riga 1 finisce in memoria attaccato al bordo Ovest della riga 2. Questa riga prende l'ultimo pixel di ogni riga e annulla la connessione al pixel successivo imponendo uno `0.0`. In matematica accademica, questo si chiama imporre una **Condizione al contorno di Dirichlet nulla**.
+- **`Riga 22: off_diag_y = np.ones(N - nx)`**
+  Crea un array di `1.0` per le connessioni "Nord e Sud". Poiché la mappa è larga 50 pixel (`nx`), per guardare il vicino a Nord o a Sud il computer deve "saltare" di 50 posizioni nella memoria.
+- **`Righe 25-26: diagonals = [...] e offsets = [...]`**
+  Indica a Python la posizione esatta in cui montare le diagonali all'interno della futura matrice. L'offset `0` è il centro (i -4), gli offset `-1, 1` sono Est e Ovest, gli offset `-50, 50` sono Nord e Sud.
+- **`Riga 29: A = sp.diags(diagonals, offsets, shape=(N, N), format='csr')`**
+  Il momento in cui la matrice prende vita grazie alla compressione CSR, spiegata qui di seguito.
+
+### Approfondimento: In cosa consiste il formato CSR?
+CSR sta per **Compressed Sparse Row**. 
+Una matrice normale di 2500x2500 ha 6.250.000 celle. La nostra equazione (lo stencil a 5 punti) piazza dei numeri solo in 12.300 celle, mentre restanti sei milioni di celle sono zeri inutili. 
+
+Il formato CSR evita di salvare la griglia vuota. Invece, crea internamente tre piccole liste di numeri (vettori 1D):
+1. **`data`**: Salva solo i numeri diversi da zero (i -4 e gli 1).
+2. **`indices`**: Salva la colonna esatta in cui si trova ciascuno di questi numeri.
+3. **`indptr`** (index pointer): Salva in quale punto del vettore `data` inizia una nuova riga della matrice.
+
+In sintesi, il formato CSR dice al computer: *"Non disegnare un foglio enorme vuoto, ma annotati su un post-it solo quali numeri ci sono e in che colonna si trovano"*. Questo abbatte drasticamente il consumo di RAM e velocizza in modo mostruoso i calcoli della Fase 3.
 
 ## Commento all'Output
 Eseguendo lo script, l'output dimostra l'efficacia dei metodi numerici applicati:

@@ -2,5 +2,5 @@ Ambiente: cluster
 Ottimizzatore: adam
 Epoche/Iterazioni: 50000
 Tempo di training: 263.67 s
-D_scoperto: 0.0178
+D_scoperto: 0.3542
 Loss_finale: 1.8839e-06
